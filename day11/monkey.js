@@ -1,47 +1,62 @@
 class Monkey {
-  _items = [];
-  _operation;
-  _inspected = 0;
-  _noWorries;
-  divisor;
-  mod;
+  #items = [];
+  #initialItems = [];
+  #inspected = 0;
+  #operation;
+  #divisor;
+
+  static #reduceWorry;
 
   receiveStuff(item) {
-    this._items.push(item);
+    this.#items.push(item);
+  }
+
+  getDivisor() {
+    return this.#divisor;
+  }
+
+  getInspected() {
+    return this.#inspected;
+  }
+
+  reset() {
+    this.#items = [...this.#initialItems];
+    this.#inspected = 0;
   }
 
   *throwStuff() {
-    this._inspected += this._items.length;
-    let item = this._items.shift();
+    this.#inspected += this.#items.length;
+    let item = this.#items.shift();
     while (item != undefined) {
-      let worry = this._operation(item);
-      if (this._noWorries) {
-        worry = Math.floor(worry / this._noWorries);
-      }
+      let worry = this.#operation(item);
 
-      if (this.mod) {
-        worry = worry % this.mod;
-      }
+      worry = Monkey.#reduceWorry(worry);
 
       yield [worry, this.test(worry)];
-      item = this._items.shift();
+      item = this.#items.shift();
     }
   }
 
-  static parseMonkey(monkeyString, noWorries) {
-    const monkey = new Monkey();
+  static setWorryReducer(reducer) {
+    Monkey.#reduceWorry = reducer;
+  }
 
-    monkey._noWorries = noWorries;
+  static parseMonkey(monkeyString) {
+    const monkey = new Monkey();
 
     const data = monkeyString
       .split("\n")
       .slice(1)
       .map((line) => line.split(": ")[1]);
 
-    monkey._items.push(...data[0].split(", ").map((d) => parseInt(d, 10)));
+    monkey.#initialItems.push(
+      ...data[0].split(", ").map((d) => parseInt(d, 10))
+    );
+    monkey.#items = [...monkey.#initialItems];
 
     const op = `n${data[1].substr(3)}`;
-    monkey._operation = (old) => {
+    monkey.#operation = (old) => {
+      // old used in eval
       let n;
       eval(op);
       return n;
@@ -51,7 +66,7 @@ class Monkey {
     const tt = parseInt(data[3].split(" ")[3], 10);
     const tf = parseInt(data[4].split(" ")[3], 10);
 
-    monkey.divisor = t;
+    monkey.#divisor = t;
     monkey.test = (level) => {
       if (level % t == 0) {
         return tt;
