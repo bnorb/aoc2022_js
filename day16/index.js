@@ -69,17 +69,27 @@ const parseInput = (input) => {
   return [valveGraph, rates];
 };
 
-const part1 = ([valveGraph, rates]) => {
-  const T = 30;
+const findMaxReleased = (
+  valveGraph,
+  rates,
+  T,
+  valveCount,
+  visited = new Set()
+) => {
+  const hashValveSet = (valveSet) => {
+    const v = [...valveSet];
+    v.sort();
+    return v.join("_");
+  };
+
   let maxReleased = 0;
-  const valveCount = Object.keys(valveGraph).length - 1;
+  const allFullReleases = {};
 
   const dfs = (
     curr = "START",
     timeLeft = T,
     pressureReleased = 0,
-    visited = new Set(),
-    openValves = 0
+    openValves = visited.size
   ) => {
     if (curr != "START") {
       pressureReleased += timeLeft * rates[curr];
@@ -91,83 +101,47 @@ const part1 = ([valveGraph, rates]) => {
         maxReleased = pressureReleased;
       }
 
-      return;
-    }
-
-    for (const [next, timeDistance] of valveGraph[curr]) {
-      if (visited.has(next)) continue;
-      if (timeLeft < timeDistance) continue;
-
-      dfs(
-        next,
-        timeLeft - timeDistance,
-        pressureReleased,
-        new Set([...visited, next]),
-        openValves
-      );
-    }
-  };
-
-  dfs();
-
-  return maxReleased;
-};
-
-const part2 = ([valveGraph, rates]) => {
-  const T = 26;
-
-  const hashValveSet = (valveSet) => {
-    const v = [...valveSet];
-    v.sort();
-    return v.join("_");
-  };
-
-  const dfs = (
-    maxReleases,
-    valveCount,
-    curr = "START",
-    timeLeft = T,
-    pressureReleased = 0,
-    visited = new Set(),
-    openValves = 0
-  ) => {
-    if (curr != "START") {
-      pressureReleased += timeLeft * rates[curr];
-      openValves++;
-    }
-
-    if (openValves == valveCount) {
-      const h = hashValveSet(visited);
-      if (pressureReleased > (maxReleases[h] || 0))
-        maxReleases[h] = pressureReleased;
+      if (openValves == valveCount) {
+        const h = hashValveSet(visited);
+        if (pressureReleased > (allFullReleases[h] || 0))
+          allFullReleases[h] = pressureReleased;
+      }
 
       return;
     }
-
-    if (timeLeft == 0) return;
 
     for (const [next, timeDistance] of valveGraph[curr]) {
       if (visited.has(next)) continue;
       if (timeLeft < timeDistance) continue;
 
       visited.add(next);
-      dfs(
-        maxReleases,
-        valveCount,
-        next,
-        timeLeft - timeDistance,
-        pressureReleased,
-        visited,
-        openValves
-      );
+      dfs(next, timeLeft - timeDistance, pressureReleased, openValves);
       visited.delete(next);
     }
   };
 
+  dfs();
+
+  return [maxReleased, allFullReleases];
+};
+
+const part1 = ([valveGraph, rates]) => {
+  const [maxReleased] = findMaxReleased(
+    valveGraph,
+    rates,
+    30,
+    Object.keys(valveGraph).length - 1
+  );
+
+  return maxReleased;
+};
+
+const part2 = ([valveGraph, rates]) => {
   const maxValveCount = Object.keys(valveGraph).length - 1;
-  const maxReleases = {};
+  let maxReleases = {};
   for (let valveCount = 1; valveCount <= maxValveCount; valveCount++) {
-    dfs(maxReleases, valveCount);
+    const [_, maxes] = findMaxReleased(valveGraph, rates, 26, valveCount);
+    maxReleases = { ...maxReleases, ...maxes };
   }
 
   const entries = Object.entries(maxReleases);
@@ -185,7 +159,8 @@ const part2 = ([valveGraph, rates]) => {
       const eleReleased = entries[j][1];
 
       if (entries[j][0].split("_").every((v) => !ownValves.has(v))) {
-        if (max < ownReleased + eleReleased) max = ownReleased + eleReleased;
+        max = Math.max(max, ownReleased + eleReleased);
+        break;
       }
     }
   }

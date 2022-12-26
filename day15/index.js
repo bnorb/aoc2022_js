@@ -17,86 +17,78 @@ const parseInput = (input) =>
       Math.abs(sX - bX) + Math.abs(sY - bY),
     ]);
 
-const part1 = (pairs) => {
-  const occupied = new Set();
-  pairs.forEach(
-    ([[sX, sY], [bX, bY]]) =>
-      occupied.add(`${sX}_${sY}`) && occupied.add(`${bX}_${bY}`)
-  );
+const findRowCoverage = (pairs, y, removeBeacons = true) => {
+  const ranges = [];
 
-  const Y = 2000000;
-
-  const noBeacon = new Set();
-
-  pairs.forEach(([[sX, sY], _, distance]) => {
-    const lineD = Math.abs(sY - Y);
-    if (lineD > distance) {
+  pairs.forEach(([[sX, sY], [bX, bY], distance]) => {
+    const yDistance = Math.abs(sY - y);
+    if (yDistance > distance) {
       return;
     }
 
-    let x = sX;
-    let d = lineD;
-    while (d <= distance) {
-      const h = `${x}_${Y}`;
-      if (!occupied.has(h) && !noBeacon.has(h)) {
-        noBeacon.add(h);
+    const xDistance = distance - yDistance;
+    const range = [sX - xDistance, sX + xDistance];
+
+    if (removeBeacons && bY == y) {
+      if (bX == range[0]) {
+        range[0]++;
+      } else {
+        range[1]--;
       }
-      x++;
-      d = Math.abs(sX - x) + lineD;
     }
 
-    x = sX;
-    d = lineD;
-    while (d <= distance) {
-      const h = `${x}_${Y}`;
-      if (!occupied.has(h) && !noBeacon.has(h)) {
-        noBeacon.add(h);
-      }
-      x--;
-      d = Math.abs(sX - x) + lineD;
-    }
+    ranges.push(range);
   });
 
-  return noBeacon.size;
+  ranges.sort((a, b) => b[0] - a[0] || b[1] - a[1]);
+
+  const aggrRanges = [];
+  let currRange = ranges.pop();
+  while (ranges.length) {
+    const nextRange = ranges.pop();
+    if (nextRange[1] <= currRange[1]) continue;
+
+    if (nextRange[0] <= currRange[1]) {
+      currRange[1] = nextRange[1];
+    } else {
+      aggrRanges.push(currRange);
+      currRange = nextRange;
+    }
+  }
+
+  aggrRanges.push(currRange);
+
+  return aggrRanges;
 };
+
+const part1 = (pairs) =>
+  findRowCoverage(pairs, 2000000).reduce(
+    (s, [min, max]) => s + (max - min + 1),
+    0
+  );
 
 const part2 = (pairs) => {
   const find = (maxXY) => {
-    const seen = new Set();
-
-    const checkPos = (x, y) => {
-      const h = `${x}_${y}`;
-      if (seen.has(h) || x < 0 || y < 0 || x > maxXY || y > maxXY) return false;
-
-      seen.add(h);
-      if (
-        pairs.every(
-          ([[sX, sY], _, d]) => d < Math.abs(sX - x) + Math.abs(sY - y)
-        )
+    const checkedRows = new Set();
+    for (const [[_, sY], __, distance] of pairs) {
+      for (
+        let y = Math.max(0, sY - distance);
+        y <= Math.min(maxXY, sY + distance);
+        y++
       ) {
-        return true;
-      }
-    };
+        if (checkedRows.has(y)) continue;
 
-    for (const [[sX, sY], _, d] of pairs) {
-      // edge 1
-      for (let x = sX - d - 1, y = sY; x <= sX && y >= sY - d - 1; x++, y--) {
-        if (checkPos(x, y)) return [x, y];
-      }
+        checkedRows.add(y);
+        const coverage = findRowCoverage(pairs, y, false);
 
-      // edge 2
-      for (let x = sX, y = sY - d - 1; x <= sX + d + 1 && y <= sY; x++, y++) {
-        if (checkPos(x, y)) return [x, y];
-      }
+        if (coverage.length == 1) {
+          if (coverage[0][0] == 1) return [0, y];
+          if (coverage[0][1] == maxXY - 1) return [maxXY, y];
+        }
 
-      // edge 3
-      for (let x = sX + d + 1, y = sY; x >= sX && y <= sY + d + 1; x--, y++) {
-        if (checkPos(x, y)) return [x, y];
-      }
-
-      // edge 4
-      for (let x = sX, y = sY + d + 1; x >= sX - d - 1 && y >= sY; x--, y--) {
-        if (checkPos(x, y)) return [x, y];
+        if (coverage.length == 2) {
+          return [coverage[0][1] + 1, y];
+        }
       }
     }
   };
